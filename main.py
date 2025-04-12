@@ -22,24 +22,6 @@ import threading
 logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ---- Flask para mantener vivo ----
-app_flask = Flask(__name__)
-
-@app_flask.route('/')
-def keep_alive():
-    return "¡Estoy vivo!"
-
-# ---- Autoping para evitar suspensión ----
-def auto_ping():
-    project_url = "https://empleobot.glitch.me"  # Reemplaza con tu URL real de Glitch
-    while True:
-        try:
-            requests.get(project_url)
-            logger.info("Ping enviado para mantener vivo")
-        except Exception as e:
-            logger.error(f"Error en ping: {e}")
-        time.sleep(200)  # 4 minutos
-
 # ---- Token y conexión ----
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
