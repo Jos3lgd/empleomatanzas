@@ -1,0 +1,3 @@
+# Excluir archivos sensibles
+.env
+credenciales.json
