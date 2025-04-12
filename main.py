@@ -32,12 +32,22 @@ usuarios_db = None
 
 try:
     logger.info("🔧 Intentando conectar con Google Sheets...")
-    CREDS = Credentials.from_service_account_file('credenciales.json', scopes=SCOPES)
+
+    # Leer credenciales desde variable de entorno
+    creds_str = os.getenv("GOOGLE_CREDS_JSON")
+    if not creds_str:
+        raise ValueError("No se encontró la variable de entorno GOOGLE_CREDS_JSON")
+
+    creds_dict = json.loads(creds_str)
+    CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     client = gspread.authorize(CREDS)
+
     sheet = client.open("EmpleoMatanzasDB")
     ofertas_db = sheet.worksheet("Ofertas")
     usuarios_db = sheet.worksheet("Usuarios")
+
     logger.info("✅ Conexión exitosa con Google Sheets")
+
 except Exception as e:
     logger.error("❌ Error conectando con Google Sheets: %s", str(e))
 
