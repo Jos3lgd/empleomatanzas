@@ -16,22 +16,22 @@ from telegram.ext import (
 import gspread
 from google.oauth2.service_account import Credentials
 
-# ---- Configuración inicial ----
+# Configuración de logging
 logging.basicConfig(
     format='[%(asctime)s] [%(levelname)s] %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# ---- Constantes ----
-ADMIN_IDS = [12345678]  # Reemplaza con tu ID real de Telegram
+# Constantes
+ADMIN_IDS = [TU_ID_DE_TELEGRAM]  # Reemplaza con tu ID real
 PALABRAS_PROHIBIDAS = {"singar", "fraude", "spam", "http://", "https://"}
 ULTIMOS_MENSAJES = {}
 PUESTO, EMPRESA, SALARIO, DESCRIPCION, CONTACTO = range(5)
 NOMBRE, TRABAJO, ESCOLARIDAD, CONTACTO_TRABAJADOR = range(5, 9)
 RESULTADOS_POR_PAGINA = 3
 
-# ---- Conexión con Google Sheets ----
+# Conexión con Google Sheets
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 
@@ -41,9 +41,7 @@ usuarios_db = None
 candidatos_db = None
 
 try:
-    logger.info("🔧 Intentando conectar con Google Sheets...")
-    
-    # Cargar credenciales
+    logger.info("Conectando con Google Sheets...")
     creds_json = os.getenv('GOOGLE_CREDS_JSON')
     if creds_json:
         creds_dict = json.loads(creds_json)
@@ -56,44 +54,37 @@ try:
     ofertas_db = sheet.worksheet("Ofertas")
     usuarios_db = sheet.worksheet("Usuarios")
     candidatos_db = sheet.worksheet("Candidatos")
-    logger.info("✅ Conexión exitosa con Google Sheets")
-    
+    logger.info("Conexión exitosa con Google Sheets")
 except Exception as e:
-    logger.error(f"❌ Error conectando con Google Sheets: {e}")
+    logger.error(f"Error conectando con Google Sheets: {e}")
 
-# ---- Funciones de base de datos ----
+# Funciones de base de datos
 def registrar_usuario(user_id: int, nombre: str, username: str, chat_id: int):
     if not usuarios_db:
         return False
-    
     try:
         try:
-            cell = usuarios_db.find(str(user_id))
-            usuarios_db.update_cell(cell.row, 4, str(chat_id))
+            usuarios_db.find(str(user_id))
             return True
         except gspread.exceptions.CellNotFound:
             usuarios_db.append_row([
-                str(user_id),
-                nombre,
+                str(user_id), nombre,
                 f"@{username}" if username else "Sin username",
                 str(chat_id),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "0",
-                "activo"
+                "0", "activo"
             ])
-            logger.info(f"👤 Nuevo usuario registrado: {user_id}")
             return True
     except Exception as e:
-        logger.error(f"❌ Error registrando usuario: {e}")
+        logger.error(f"Error registrando usuario: {e}")
         return False
 
 def nueva_oferta(user_id: int, datos: dict):
     if not ofertas_db:
         return False
-    
     try:
         ofertas_db.append_row([
-            str(len(ofertas_db.col_values(1)) + 1),
+            str(len(ofertas_db.col_values(1)) + 1,
             datos["puesto"],
             datos["empresa"],
             datos["salario"],
@@ -102,84 +93,143 @@ def nueva_oferta(user_id: int, datos: dict):
             datetime.now().strftime("%Y-%m-%d"),
             str(user_id)
         ])
-        cell = usuarios_db.find(str(user_id))
-        count = int(usuarios_db.cell(cell.row, 6).value)
-        usuarios_db.update_cell(cell.row, 6, str(count + 1))
-        logger.info("📝 Nueva oferta guardada")
         return True
     except Exception as e:
-        logger.error(f"❌ Error guardando oferta: {e}")
+        logger.error(f"Error guardando oferta: {e}")
         return False
 
-# ---- Comandos básicos ----
+# Comandos básicos
 async def start(update: Update, context: CallbackContext):
-    try:
-        logger.info("🚀 Comando /start recibido")
-        user = update.effective_user
-        chat_id = update.effective_chat.id
-        
-        # Registrar usuario
-        if usuarios_db:
-            registrar_usuario(user.id, user.first_name, user.username, chat_id)
-        
-        # Enviar mensaje de bienvenida
-        await update.message.reply_photo(
-            photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",
-            caption=(
-                "👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\n"
-                "💻 Desarrollado por @infomatanzas\n"
-                "📲 Usa /menu para ver todas las opciones"
-            )
-        )
-    except Exception as e:
-        logger.error(f"❌ Error en comando start: {e}")
-        await update.message.reply_text("🚫 Ocurrió un error al iniciar. Por favor intenta nuevamente.")
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    registrar_usuario(user.id, user.first_name, user.username, chat_id)
+    await update.message.reply_photo(
+        photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",
+        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\nUsa /menu para ver opciones."
+    )
 
 async def menu(update: Update, context: CallbackContext):
-    try:
-        teclado = [
-            [InlineKeyboardButton("🔍 Ofertas de trabajo", callback_data="buscar")],
-            [InlineKeyboardButton("💼 Ofrecer trabajo", callback_data="ofertar")],
-            [InlineKeyboardButton("🧑‍💼 Solicitar trabajo", callback_data="registro")],
-            [InlineKeyboardButton("🔎 Buscar trabajadores", callback_data="buscar_candidatos")],
-            [InlineKeyboardButton("ℹ️ Ayuda", callback_data="ayuda")]
-        ]
-        reply_markup = InlineKeyboardMarkup(teclado)
+    keyboard = [
+        [InlineKeyboardButton("🔍 Ofertas de trabajo", callback_data="buscar_ofertas")],
+        [InlineKeyboardButton("💼 Ofrecer trabajo", callback_data="ofertar_trabajo")],
+        [InlineKeyboardButton("🧑‍💼 Solicitar trabajo", callback_data="registro_trabajador")],
+        [InlineKeyboardButton("🔎 Buscar trabajadores", callback_data="buscar_candidatos")],
+        [InlineKeyboardButton("ℹ️ Ayuda", callback_data="mostrar_ayuda")]
+    ]
+    await update.message.reply_text(
+        "📲 Menú Principal:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def ayuda(update: Update, context: CallbackContext):
+    await update.message.reply_text(
+        "ℹ️ Ayuda del Bot:\n\n"
+        "/start - Iniciar el bot\n"
+        "/menu - Mostrar menú\n"
+        "/ofertar - Publicar oferta\n"
+        "/buscar - Buscar ofertas\n"
+        "/buscoempleo - Registrarse\n"
+        "/buscarcandidatos - Buscar trabajadores\n"
+        "/ayuda - Mostrar esta ayuda"
+    )
+
+# Búsquedas
+async def buscar_ofertas(update: Update, context: CallbackContext):
+    if not ofertas_db:
+        await update.message.reply_text("Error al acceder a ofertas")
+        return
+    
+    ofertas = ofertas_db.get_all_records()
+    if not ofertas:
+        await update.message.reply_text("No hay ofertas disponibles")
+        return
+    
+    for oferta in reversed(ofertas[:3]):
         await update.message.reply_text(
-            "📲 Menú Principal - Elige una opción:",
-            reply_markup=reply_markup
+            f"💼 {oferta['Puesto']}\n"
+            f"🏢 {oferta['Empresa']}\n"
+            f"💰 {oferta['Salario']}\n"
+            f"📞 {oferta['Contacto']}"
         )
-    except Exception as e:
-        logger.error(f"❌ Error mostrando menú: {e}")
+    
+    if len(ofertas) > 3:
+        await update.message.reply_text(
+            "¿Ver más ofertas?",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_ofertas")]
+            ))
 
-# ... (resto del código permanece igual)
+async def buscar_candidatos(update: Update, context: CallbackContext):
+    if not candidatos_db:
+        await update.message.reply_text("Error al acceder a candidatos")
+        return
+    
+    candidatos = candidatos_db.get_all_records()
+    if not candidatos:
+        await update.message.reply_text("No hay candidatos registrados")
+        return
+    
+    for candidato in reversed(candidatos[:3]):
+        await update.message.reply_text(
+            f"👤 {candidato['Nombre']}\n"
+            f"🛠️ {candidato['Trabajo']}\n"
+            f"📞 {candidato['Contacto']}"
+        )
+    
+    if len(candidatos) > 3:
+        await update.message.reply_text(
+            "¿Ver más candidatos?",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_candidatos")]
+            ))
 
-# ---- Función Principal ----
+# Manejador de botones
+async def handle_button(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "buscar_ofertas":
+        await buscar_ofertas(query, context)
+    elif query.data == "ofertar_trabajo":
+        await iniciar_oferta(query, context)
+    elif query.data == "registro_trabajador":
+        await iniciar_registro(query, context)
+    elif query.data == "buscar_candidatos":
+        await buscar_candidatos(query, context)
+    elif query.data == "mostrar_ayuda":
+        await ayuda(query, context)
+    elif query.data == "ver_mas_ofertas":
+        await ver_mas_ofertas(query, context)
+    elif query.data == "ver_mas_candidatos":
+        await ver_mas_candidatos(query, context)
+
+# Función principal
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     
     # Configurar comandos del menú
-    async def establecer_comandos(app):
+    async def set_commands(app):
         await app.bot.set_my_commands([
             ("start", "Iniciar el bot"),
-            ("menu", "Mostrar menú interactivo"),
-            ("ofertar", "Publicar oferta de trabajo"),
-            ("buscar", "Buscar ofertas disponibles"),
-            ("buscoempleo", "Registrarse como candidato"),
+            ("menu", "Mostrar menú"),
+            ("ofertar", "Publicar oferta"),
+            ("buscar", "Buscar ofertas"),
+            ("buscoempleo", "Registrarse"),
             ("buscarcandidatos", "Buscar trabajadores"),
             ("ayuda", "Mostrar ayuda")
         ])
-        logger.info("✅ Comandos del menú configurados")
     
-    app.post_init = establecer_comandos
+    app.post_init = set_commands
     
-    # Handlers principales
+    # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu))
+    app.add_handler(CommandHandler("ayuda", ayuda))
+    app.add_handler(CommandHandler("buscar", buscar_ofertas))
+    app.add_handler(CommandHandler("buscarcandidatos", buscar_candidatos))
+    app.add_handler(CallbackQueryHandler(handle_button))
     
-    # ... (resto de los handlers permanece igual)
-    
-    logger.info("🤖 Bot iniciado correctamente")
+    logger.info("Bot iniciado")
     app.run_polling()
 
 if __name__ == '__main__':
