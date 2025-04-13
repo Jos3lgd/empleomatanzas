@@ -86,7 +86,7 @@ def nueva_oferta(user_id: int, datos: dict):
         return False
     try:
         ofertas_db.append_row([
-            str(len(ofertas_db.col_values(1)) + 1,
+            str(len(ofertas_db.col_values(1)) + 1),
             datos["puesto"],
             datos["empresa"],
             datos["salario"],
