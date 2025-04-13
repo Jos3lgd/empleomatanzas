@@ -68,11 +68,13 @@ def registrar_usuario(user_id: int, nombre: str, username: str, chat_id: int):
             return True
         except gspread.exceptions.CellNotFound:
             usuarios_db.append_row([
-                str(user_id), nombre,
+                str(user_id),
+                nombre,
                 f"@{username}" if username else "Sin username",
                 str(chat_id),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "0", "activo"
+                "0",
+                "activo"
             ])
             return True
     except Exception as e:
@@ -116,9 +118,10 @@ async def menu(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🔎 Buscar trabajadores", callback_data="buscar_candidatos")],
         [InlineKeyboardButton("ℹ️ Ayuda", callback_data="mostrar_ayuda")]
     ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
         "📲 Menú Principal:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=reply_markup
     )
 
 async def ayuda(update: Update, context: CallbackContext):
@@ -157,7 +160,8 @@ async def buscar_ofertas(update: Update, context: CallbackContext):
             "¿Ver más ofertas?",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_ofertas")]
-            ))
+            ])
+        )
 
 async def buscar_candidatos(update: Update, context: CallbackContext):
     if not candidatos_db:
@@ -181,7 +185,8 @@ async def buscar_candidatos(update: Update, context: CallbackContext):
             "¿Ver más candidatos?",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_candidatos")]
-            ))
+            ])
+        )
 
 # Manejador de botones
 async def handle_button(update: Update, context: CallbackContext):
