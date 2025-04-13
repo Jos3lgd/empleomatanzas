@@ -157,7 +157,7 @@ async def ayuda(update: Update, context: CallbackContext):
         "❌ /cancelar \\— Cancelar una acción activa\n\n"
         "👩‍💻 Este Bot está en fase Beta, si encuentras algún problema o tienes sugerencias puedes contactar con Soporte @AtencionPoblacionBot\n\n"
         "*⚠️ ATENCIÓN\\!\\!\\!* Las ofertas se irán eliminando automáticamente cada 15 días, tenga eso en cuenta",
-        parse_mode="MarkdownV2
+        parse_mode="MarkdownV2"
     )
 
 # Búsquedas
