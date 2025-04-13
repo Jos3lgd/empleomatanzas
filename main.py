@@ -128,7 +128,7 @@ async def start(update: Update, context: CallbackContext):
         caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n"
         "💻 Este Bot está desarrollado por el equipo de @infomatanzas y está en fase Beta.\n\n"
         "Usa /menu para ver opciones.\n"
-        "Usa /help o el Botón Ayuda para conocer como funciona"
+        "Usa /ayuda o el Botón Ayuda para conocer como funciona"
     )
 
 async def menu(update: Update, context: CallbackContext):
