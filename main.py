@@ -21,7 +21,7 @@ logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', level=lo
 logger = logging.getLogger(__name__)
 
 # ---- Constantes ----
-ADMIN_IDS = [12345678]  # Reemplaza con tu ID de Telegram
+ADMIN_IDS = [8046846584]  # Reemplaza con tu ID de Telegram
 PALABRAS_PROHIBIDAS = {"singar", "fraude", "spam", "http://", "https://"}
 ULTIMOS_MENSAJES = {}
 PUESTO, EMPRESA, SALARIO, DESCRIPCION, CONTACTO = range(5)
