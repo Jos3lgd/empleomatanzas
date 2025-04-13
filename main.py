@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Constantes
-ADMIN_IDS = [TU_ID_DE_TELEGRAM]  # Reemplaza con tu ID real
+ADMIN_IDS = [8046846584]  # Reemplaza con tu ID real
 PALABRAS_PROHIBIDAS = {"singar", "fraude", "spam", "http://", "https://"}
 ULTIMOS_MENSAJES = {}
 PUESTO, EMPRESA, SALARIO, DESCRIPCION, CONTACTO = range(5)
