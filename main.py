@@ -60,29 +60,25 @@ try:
     
 except Exception as e:
     logger.error(f"❌ Error conectando con Google Sheets: {e}")
-    # El bot puede continuar funcionando sin Sheets, pero con funcionalidad limitada
 
 # ---- Funciones de base de datos ----
 def registrar_usuario(user_id: int, nombre: str, username: str, chat_id: int):
     if not usuarios_db:
         return False
     try:
-        # Verificar si el usuario ya existe
         try:
             cell = usuarios_db.find(str(user_id))
-            # Actualizar chat_id por si cambió
             usuarios_db.update_cell(cell.row, 4, str(chat_id))
             return True
         except gspread.exceptions.CellNotFound:
-            # Usuario nuevo
             usuarios_db.append_row([
                 str(user_id), 
                 nombre,
                 f"@{username}" if username else "Sin username",
                 str(chat_id),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "0",  # Contador de ofertas
-                "activo"  # Estado de notificaciones
+                "0",
+                "activo"
             ])
             logger.info(f"👤 Usuario registrado: {user_id}")
             return True
@@ -113,7 +109,7 @@ def nueva_oferta(user_id: int, datos: dict):
         logger.error(f"❌ Error guardando oferta: {e}")
         return False
 
-# ---- Funciones de mensajería masiva ----
+# ---- Funciones de mensajería ----
 async def enviar_mensaje_a_usuario(context: CallbackContext, chat_id: int, mensaje: str):
     try:
         await context.bot.send_message(
@@ -121,28 +117,24 @@ async def enviar_mensaje_a_usuario(context: CallbackContext, chat_id: int, mensa
             text=mensaje,
             parse_mode='Markdown'
         )
-        logger.info(f"✅ Mensaje enviado a {chat_id}")
         return True
     except Exception as e:
         logger.error(f"❌ Error enviando mensaje a {chat_id}: {e}")
         return False
 
 async def enviar_mensaje_admin(update: Update, context: CallbackContext):
-    """Permite al admin enviar mensajes a todos los usuarios"""
     if not context.args:
         await update.message.reply_text("Uso: /enviar <mensaje>")
         return
     
     mensaje = ' '.join(context.args)
-    confirmacion = await update.message.reply_text(
+    await update.message.reply_text(
         f"¿Enviar este mensaje a todos los usuarios?\n\n{mensaje}",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ Sí, enviar a todos", callback_data=f"confirmar_envio:{mensaje}")],
             [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_envio")]
         ])
     )
-    context.user_data["mensaje_original"] = mensaje
-    context.user_data["mensaje_id"] = confirmacion.message_id
 
 async def confirmar_envio(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -151,48 +143,35 @@ async def confirmar_envio(update: Update, context: CallbackContext):
     if query.data.startswith("confirmar_envio:"):
         mensaje = query.data.split(":", 1)[1]
         usuarios = usuarios_db.get_all_records()
-        total = 0
-        exitosos = 0
+        total = exitosos = 0
         
         await query.edit_message_text(f"⏳ Enviando mensaje a {len(usuarios)} usuarios...")
         
         for usuario in usuarios:
             if usuario.get("Notificaciones", "activo") == "activo":
                 try:
-                    await enviar_mensaje_a_usuario(
-                        context,
-                        int(usuario["ChatID"]),
-                        mensaje
-                    )
+                    await enviar_mensaje_a_usuario(context, int(usuario["ChatID"]), mensaje)
                     exitosos += 1
-                    time.sleep(0.5)  # Evitar flood
+                    time.sleep(0.5)
                 except Exception as e:
                     logger.error(f"Error enviando a {usuario['ChatID']}: {e}")
                 total += 1
         
         await query.edit_message_text(
-            f"✅ Envío completado!\n"
-            f"• Total: {total}\n"
-            f"• Exitosos: {exitosos}\n"
-            f"• Fallidos: {total - exitosos}"
+            f"✅ Envío completado!\nTotal: {total}\nExitosos: {exitosos}\nFallidos: {total - exitosos}"
         )
     else:
         await query.edit_message_text("❌ Envío cancelado")
 
-# ---- Comandos para usuarios ----
+# ---- Funciones del menú ----
 async def start(update: Update, context: CallbackContext):
-    logger.info("🚀 /start recibido")
     user = update.effective_user
     chat_id = update.effective_chat.id
-    
     if usuarios_db:
         registrar_usuario(user.id, user.first_name, user.username, chat_id)
-    
     await update.message.reply_photo(
         photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",
-        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\n"
-        "💻 Este Bot está desarrollado por el equipo de @infomatanzas\n"
-        "Usa /menu para ver opciones."
+        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!"
     )
 
 async def menu(update: Update, context: CallbackContext):
@@ -205,80 +184,60 @@ async def menu(update: Update, context: CallbackContext):
     ]
     await update.message.reply_text("📲 Elige una opción:", reply_markup=InlineKeyboardMarkup(teclado))
 
-async def silenciar_notificaciones(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    try:
-        cell = usuarios_db.find(str(user_id))
-        usuarios_db.update_cell(cell.row, 7, "silenciado")  # Columna 7 = Estado
-        await update.message.reply_text("🔕 Has desactivado las notificaciones. Usa /activar para volver a recibirlas.")
-    except Exception as e:
-        logger.error(f"Error al silenciar: {e}")
-        await update.message.reply_text("❌ Error al procesar tu solicitud")
-
-async def activar_notificaciones(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    try:
-        cell = usuarios_db.find(str(user_id))
-        usuarios_db.update_cell(cell.row, 7, "activo")
-        await update.message.reply_text("🔔 Notificaciones activadas. Usa /silenciar para dejar de recibirlas.")
-    except Exception as e:
-        logger.error(f"Error al activar: {e}")
-        await update.message.reply_text("❌ Error al procesar tu solicitud")
-
-# ---- Flujo para buscar candidatos ----
-async def buscar_candidatos(update: Update, context: CallbackContext):
-    logger.info("🔎 Buscar candidatos iniciado")
-    if not candidatos_db:
-        await update.message.reply_text("⚠️ No se puede acceder a la base de datos.")
-        return
-    
-    try:
-        todos = candidatos_db.get_all_records()
-        total = len(todos)
-
-        if total == 0:
-            await update.message.reply_text("😕 No hay personas registradas buscando empleo.")
-            return
-
-        inicio = context.user_data.get("candidato_index", 0)
-        fin = inicio + 3
-        mostrar = todos[max(0, total - fin):total - inicio]
-
-        for candidato in reversed(mostrar):
-            msg = (
-                f"👤 *Nombre:* {candidato['Nombre']}\n"
-                f"🛠️ *Trabajo buscado:* {candidato['Trabajo']}\n"
-                f"🎓 *Escolaridad:* {candidato['Escolaridad']}\n"
-                f"📱 *Contacto:* {candidato['Contacto']}\n"
-                f"📅 *Fecha:* {candidato['Fecha']}"
-            )
-            await update.message.reply_markdown(msg)
-
-        if fin < total:
-            context.user_data["candidato_index"] = fin
-            await update.message.reply_text(
-                "¿Ver más candidatos?",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_candidatos")]
-                ])
-            )
-        else:
-            await update.message.reply_text("✅ Ya has visto todos los perfiles.")
-            context.user_data["candidato_index"] = 0
-
-    except Exception as e:
-        logger.error(f"❌ Error al buscar candidatos: {e}")
-        await update.message.reply_text("❌ Error al consultar la base de datos.")
-
-async def ver_mas_candidatos(update: Update, context: CallbackContext):
+async def manejar_botones(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    await buscar_candidatos(query, context)
+    
+    if query.data == "buscar":
+        await buscar_ofertas(query, context)
+    elif query.data == "ofertar":
+        await iniciar_oferta(query, context)
+    elif query.data == "registro":
+        await iniciar_registro_trabajador(query, context)
+    elif query.data == "buscar_candidatos":
+        await buscar_candidatos(query, context)
+    elif query.data == "ayuda":
+        await ayuda(query, context)
 
-# ---- Flujo para registrar candidatos ----
+# ---- Flujos de conversación ----
+async def iniciar_oferta(update: Update, context: CallbackContext):
+    if update.callback_query:
+        await update.callback_query.message.reply_text("💼 ¿Cuál es el puesto de trabajo?")
+    else:
+        await update.message.reply_text("💼 ¿Cuál es el puesto de trabajo?")
+    return PUESTO
+
+async def recibir_puesto(update: Update, context: CallbackContext):
+    context.user_data["puesto"] = update.message.text
+    await update.message.reply_text("🏢 ¿Nombre de la empresa?")
+    return EMPRESA
+
+async def recibir_empresa(update: Update, context: CallbackContext):
+    context.user_data["empresa"] = update.message.text
+    await update.message.reply_text("💰 ¿Salario ofrecido?")
+    return SALARIO
+
+async def recibir_salario(update: Update, context: CallbackContext):
+    context.user_data["salario"] = update.message.text
+    await update.message.reply_text("📝 Breve descripción del puesto:")
+    return DESCRIPCION
+
+async def recibir_descripcion(update: Update, context: CallbackContext):
+    context.user_data["descripcion"] = update.message.text
+    await update.message.reply_text("📱 ¿Forma de contacto?")
+    return CONTACTO
+
+async def recibir_contacto(update: Update, context: CallbackContext):
+    context.user_data["contacto"] = update.message.text
+    user = update.effective_user
+    if nueva_oferta(user.id, context.user_data):
+        await update.message.reply_text("✅ ¡Oferta publicada con éxito!")
+    else:
+        await update.message.reply_text("❌ Error al guardar la oferta.")
+    return ConversationHandler.END
+
 async def iniciar_registro_trabajador(update: Update, context: CallbackContext):
     if update.callback_query:
-        await update.callback_query.answer()
         await update.callback_query.message.reply_text("👤 ¿Cuál es tu nombre completo?")
     else:
         await update.message.reply_text("👤 ¿Cuál es tu nombre completo?")
@@ -301,17 +260,12 @@ async def recibir_escolaridad(update: Update, context: CallbackContext):
 
 async def recibir_contacto_trabajador(update: Update, context: CallbackContext):
     context.user_data["contacto"] = update.message.text
-    datos = context.user_data
-    if not candidatos_db:
-        await update.message.reply_text("⚠️ No se puede acceder a la base de datos.")
-        return ConversationHandler.END
-    
     try:
         candidatos_db.append_row([
-            datos["nombre"],
-            datos["trabajo"],
-            datos["escolaridad"],
-            datos["contacto"],
+            context.user_data["nombre"],
+            context.user_data["trabajo"],
+            context.user_data["escolaridad"],
+            context.user_data["contacto"],
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ])
         await update.message.reply_text("✅ ¡Tu perfil fue registrado correctamente!")
@@ -320,11 +274,63 @@ async def recibir_contacto_trabajador(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ Ocurrió un error al guardar tu información.")
     return ConversationHandler.END
 
+# ---- Búsquedas ----
+async def buscar_ofertas(update: Update, context: CallbackContext):
+    if not ofertas_db:
+        await update.message.reply_text("⚠️ No se puede acceder a la base de datos.")
+        return
+    
+    try:
+        todas = ofertas_db.get_all_records()
+        if not todas:
+            await update.message.reply_text("😕 Aún no hay ofertas publicadas.")
+            return
+        
+        for oferta in reversed(todas[:5]):  # Mostrar las 5 más recientes
+            msg = (
+                f"💼 *Puesto:* {oferta['Puesto']}\n"
+                f"🏢 *Empresa:* {oferta['Empresa']}\n"
+                f"💰 *Salario:* {oferta['Salario']}\n"
+                f"📝 *Descripción:* {oferta['Descripción']}\n"
+                f"📱 *Contacto:* {oferta['Contacto']}\n"
+                f"📅 *Fecha:* {oferta['Fecha']}"
+            )
+            await update.message.reply_markdown(msg)
+            
+    except Exception as e:
+        logger.error(f"❌ Error buscando ofertas: {e}")
+        await update.message.reply_text("❌ Error buscando ofertas.")
+
+async def buscar_candidatos(update: Update, context: CallbackContext):
+    if not candidatos_db:
+        await update.message.reply_text("⚠️ No se puede acceder a la base de datos.")
+        return
+    
+    try:
+        todos = candidatos_db.get_all_records()
+        if not todos:
+            await update.message.reply_text("😕 No hay personas registradas buscando empleo.")
+            return
+        
+        for candidato in reversed(todos[:5]):  # Mostrar los 5 más recientes
+            msg = (
+                f"👤 *Nombre:* {candidato['Nombre']}\n"
+                f"🛠️ *Trabajo buscado:* {candidato['Trabajo']}\n"
+                f"🎓 *Escolaridad:* {candidato['Escolaridad']}\n"
+                f"📱 *Contacto:* {candidato['Contacto']}\n"
+                f"📅 *Fecha:* {candidato['Fecha']}"
+            )
+            await update.message.reply_markdown(msg)
+            
+    except Exception as e:
+        logger.error(f"❌ Error al buscar candidatos: {e}")
+        await update.message.reply_text("❌ Error al consultar la base de datos.")
+
 # ---- Función principal ----
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     
-    # Configurar comandos del bot
+    # Configurar comandos
     async def establecer_comandos(app):
         await app.bot.set_my_commands([
             ("start", "Iniciar el bot"),
@@ -333,11 +339,8 @@ def main():
             ("buscar", "Buscar ofertas"),
             ("buscoempleo", "Registrarte como buscador de empleo"),
             ("buscarcandidatos", "Buscar trabajadores"),
-            ("silenciar", "Desactivar notificaciones"),
-            ("activar", "Activar notificaciones"),
             ("help", "Ver ayuda")
         ])
-        logger.info("✅ Comandos establecidos")
     
     app.post_init = establecer_comandos
     
@@ -348,11 +351,26 @@ def main():
     # Handlers para usuarios
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu))
-    app.add_handler(CommandHandler("silenciar", silenciar_notificaciones))
-    app.add_handler(CommandHandler("activar", activar_notificaciones))
+    app.add_handler(CommandHandler("buscar", buscar_ofertas))
     app.add_handler(CommandHandler("buscarcandidatos", buscar_candidatos))
     
     # Handlers para flujos de conversación
+    ofertar_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("ofertar", iniciar_oferta),
+            CallbackQueryHandler(iniciar_oferta, pattern="^ofertar$")
+        ],
+        states={
+            PUESTO: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_puesto)],
+            EMPRESA: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_empresa)],
+            SALARIO: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_salario)],
+            DESCRIPCION: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_descripcion)],
+            CONTACTO: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_contacto)],
+        },
+        fallbacks=[CommandHandler("cancelar", lambda u,c: ConversationHandler.END)],
+        per_message=False
+    )
+    
     registro_handler = ConversationHandler(
         entry_points=[
             CommandHandler("buscoempleo", iniciar_registro_trabajador),
@@ -365,14 +383,13 @@ def main():
             CONTACTO_TRABAJADOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_contacto_trabajador)],
         },
         fallbacks=[CommandHandler("cancelar", lambda u,c: ConversationHandler.END)],
-        per_message=True
+        per_message=False
     )
+    
+    app.add_handler(ofertar_handler)
     app.add_handler(registro_handler)
     
-    # Handler para búsqueda de candidatos
-    app.add_handler(CallbackQueryHandler(ver_mas_candidatos, pattern="^ver_mas_candidatos$"))
-    
-    # Handler general para botones
+    # Handler para botones del menú
     app.add_handler(CallbackQueryHandler(manejar_botones))
     
     logger.info("🤖 Bot iniciado y escuchando...")
