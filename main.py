@@ -135,7 +135,7 @@ async def start(update: Update, context: CallbackContext):
         logger.error(f"Fallo al registrar usuario {user.id}")
     await update.message.reply_photo(
         photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",
-        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\nUsa /menu para ver opciones."
+        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\nUsa /menu para ver opciones.\nUsa /ayuda para ver cómo funciona."
     )
 
 async def menu(update: Update, context: CallbackContext):
