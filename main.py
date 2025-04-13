@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
@@ -13,10 +14,8 @@ from telegram.ext import (
 )
 import gspread
 from google.oauth2.service_account import Credentials
-from flask import Flask
 import requests
 import time
-import threading
 
 # ---- Logging ----
 logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', level=logging.INFO)
@@ -32,22 +31,20 @@ usuarios_db = None
 
 try:
     logger.info("🔧 Intentando conectar con Google Sheets...")
-
-    # Leer credenciales desde variable de entorno
-    creds_str = os.getenv("GOOGLE_CREDS_JSON")
-    if not creds_str:
-        raise ValueError("No se encontró la variable de entorno GOOGLE_CREDS_JSON")
-
-    creds_dict = json.loads(creds_str)
-    CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    # Para Railway, las credenciales deben venir de una variable de entorno
+    creds_json = os.getenv('GOOGLE_CREDENTIALS')
+    if creds_json:
+        creds_dict = json.loads(creds_json)
+        CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    else:
+        # Fallback al archivo local (para desarrollo)
+        CREDS = Credentials.from_service_account_file('credenciales.json', scopes=SCOPES)
+    
     client = gspread.authorize(CREDS)
-
     sheet = client.open("EmpleoMatanzasDB")
     ofertas_db = sheet.worksheet("Ofertas")
     usuarios_db = sheet.worksheet("Usuarios")
-
     logger.info("✅ Conexión exitosa con Google Sheets")
-
 except Exception as e:
     logger.error("❌ Error conectando con Google Sheets: %s", str(e))
 
@@ -160,7 +157,7 @@ async def start(update: Update, context: CallbackContext):
     if usuarios_db:
         registrar_usuario(user.id, user.first_name, user.username)
     await update.message.reply_photo(
-        photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",  # Reemplaza con tu URL real
+        photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",
         caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\n"
         "💻 Este Bot está desarrollado por el equipo de @infomatanzas y está en fase Beta.\n"
         "Usa /menu para ver opciones."
@@ -458,15 +455,8 @@ def main():
 
     limpiar_ofertas_y_candidatos()
 
-    # Inicia Flask en un hilo separado
-    flask_thread = threading.Thread(target=lambda: app_flask.run(host='0.0.0.0', port=3000))
-    flask_thread.start()
-
-    # Inicia el autoping
-    ping_thread = threading.Thread(target=auto_ping)
-    ping_thread.start()
-
     # Inicia el bot
+    logger.info("🤖 Bot iniciado y escuchando...")
     app.run_polling()
 
 if __name__ == '__main__':
