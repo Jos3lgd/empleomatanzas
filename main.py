@@ -146,8 +146,7 @@ async def menu(update: Update, context: CallbackContext):
     )
 
 async def ayuda(update: Update, context: CallbackContext):
-    logger.info("ℹ️ Ayuda solicitada")
-    mensaje = (
+    await update.message.reply_text(
         "*Hola, gracias por utilizar nuestro Bot*\n\n"
         "Puedes utilizar los comandos disponibles en el menú en la parte inferior izquierda o teclearlos:\n\n"
         "📎 /start — Iniciar el bot\n"
