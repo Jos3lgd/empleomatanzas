@@ -125,7 +125,10 @@ async def start(update: Update, context: CallbackContext):
     registrar_usuario(user.id, user.first_name, user.username, chat_id)
     await update.message.reply_photo(
         photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",
-        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\nUsa /menu para ver opciones."
+        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n"
+        "💻 Este Bot está desarrollado por el equipo de @infomatanzas y está en fase Beta.\n\n"
+        "Usa /menu para ver opciones.\n"
+        "Usa /help o el Botón Ayuda para conocer como funciona"
     )
 
 async def menu(update: Update, context: CallbackContext):
@@ -144,16 +147,16 @@ async def menu(update: Update, context: CallbackContext):
 
 async def ayuda(update: Update, context: CallbackContext):
     await update.message.reply_text(
-        "ℹ️ Ayuda del Bot:\n\n"
-        "/start - Iniciar el bot\n"
-        "/menu - Mostrar menú\n"
-        "/ofertar - Publicar oferta\n"
-        "/buscar - Buscar ofertas\n"
-        "/buscoempleo - Registrarse\n"
-        "/buscarcandidatos - Buscar trabajadores\n"
-        "/cancelar - Cancelar acción\n"
-        "/enviar - Enviar mensaje masivo (admin)\n"
-        "/ayuda - Mostrar esta ayuda"
+        "*Hola, gracias por utilizar nuestro Bot*\n\n"
+        "Puedes utilizar los comandos disponibles en el menú en la parte inferior izquierda o teclearlos:\n\n"
+        "📎 /start — Iniciar el bot\n"
+        "📋 /menu — Ver el menú interactivo\n"
+        "💼 /ofertar — Publicar una oferta de empleo\n"
+        "🔍 /buscar — Buscar ofertas publicadas\n"
+        "🧑‍💼 /buscoempleo — Registrarte como buscador de empleo\n"
+        "❌ /cancelar — Cancelar una acción activa\n\n"
+        "👩‍💻 Este Bot está en fase Beta, si encuentras algún problema o tienes sugerencias puedes contactar con Soporte @AtencionPoblacionBot\n\n"
+        "⚠️ ATENCIÓN!!! Las ofertas se irán eliminando automáticamente cada 15 días, tenga eso en cuenta"
     )
 
 # Búsquedas
