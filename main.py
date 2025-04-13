@@ -34,6 +34,7 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapi
 sheet = None
 ofertas_db = None
 usuarios_db = None
+candidatos_db = None
 
 try:
     logger.info("🔧 Intentando conectar con Google Sheets...")
@@ -54,6 +55,7 @@ try:
     sheet = client.open("EmpleoMatanzasDB")
     ofertas_db = sheet.worksheet("Ofertas")
     usuarios_db = sheet.worksheet("Usuarios")
+    candidatos_db = sheet.worksheet("Candidatos")
     logger.info("✅ Conexión exitosa con Google Sheets")
     
 except Exception as e:
@@ -190,8 +192,7 @@ async def start(update: Update, context: CallbackContext):
         photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",
         caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\n"
         "💻 Este Bot está desarrollado por el equipo de @infomatanzas\n"
-        "Usa /menu para ver opciones.\n"
-        "Usa /help o el Botón Ayuda para conocer como funciona"
+        "Usa /menu para ver opciones."
     )
 
 async def menu(update: Update, context: CallbackContext):
@@ -199,6 +200,7 @@ async def menu(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🔍 Ofertas de trabajo", callback_data="buscar")],
         [InlineKeyboardButton("💼 Ofrecer trabajo", callback_data="ofertar")],
         [InlineKeyboardButton("🧑‍💼 Solicitar trabajo", callback_data="registro")],
+        [InlineKeyboardButton("🔎 Buscar trabajadores", callback_data="buscar_candidatos")],
         [InlineKeyboardButton("ℹ️ Ayuda", callback_data="ayuda")]
     ]
     await update.message.reply_text("📲 Elige una opción:", reply_markup=InlineKeyboardMarkup(teclado))
@@ -223,6 +225,101 @@ async def activar_notificaciones(update: Update, context: CallbackContext):
         logger.error(f"Error al activar: {e}")
         await update.message.reply_text("❌ Error al procesar tu solicitud")
 
+# ---- Flujo para buscar candidatos ----
+async def buscar_candidatos(update: Update, context: CallbackContext):
+    logger.info("🔎 Buscar candidatos iniciado")
+    if not candidatos_db:
+        await update.message.reply_text("⚠️ No se puede acceder a la base de datos.")
+        return
+    
+    try:
+        todos = candidatos_db.get_all_records()
+        total = len(todos)
+
+        if total == 0:
+            await update.message.reply_text("😕 No hay personas registradas buscando empleo.")
+            return
+
+        inicio = context.user_data.get("candidato_index", 0)
+        fin = inicio + 3
+        mostrar = todos[max(0, total - fin):total - inicio]
+
+        for candidato in reversed(mostrar):
+            msg = (
+                f"👤 *Nombre:* {candidato['Nombre']}\n"
+                f"🛠️ *Trabajo buscado:* {candidato['Trabajo']}\n"
+                f"🎓 *Escolaridad:* {candidato['Escolaridad']}\n"
+                f"📱 *Contacto:* {candidato['Contacto']}\n"
+                f"📅 *Fecha:* {candidato['Fecha']}"
+            )
+            await update.message.reply_markdown(msg)
+
+        if fin < total:
+            context.user_data["candidato_index"] = fin
+            await update.message.reply_text(
+                "¿Ver más candidatos?",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_candidatos")]
+                ])
+            )
+        else:
+            await update.message.reply_text("✅ Ya has visto todos los perfiles.")
+            context.user_data["candidato_index"] = 0
+
+    except Exception as e:
+        logger.error(f"❌ Error al buscar candidatos: {e}")
+        await update.message.reply_text("❌ Error al consultar la base de datos.")
+
+async def ver_mas_candidatos(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    await buscar_candidatos(query, context)
+
+# ---- Flujo para registrar candidatos ----
+async def iniciar_registro_trabajador(update: Update, context: CallbackContext):
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text("👤 ¿Cuál es tu nombre completo?")
+    else:
+        await update.message.reply_text("👤 ¿Cuál es tu nombre completo?")
+    return NOMBRE
+
+async def recibir_nombre(update: Update, context: CallbackContext):
+    context.user_data["nombre"] = update.message.text
+    await update.message.reply_text("🛠️ ¿Qué tipo de trabajo estás buscando?")
+    return TRABAJO
+
+async def recibir_trabajo(update: Update, context: CallbackContext):
+    context.user_data["trabajo"] = update.message.text
+    await update.message.reply_text("🎓 ¿Cuál es tu escolaridad o título?")
+    return ESCOLARIDAD
+
+async def recibir_escolaridad(update: Update, context: CallbackContext):
+    context.user_data["escolaridad"] = update.message.text
+    await update.message.reply_text("📞 ¿Cómo te pueden contactar?")
+    return CONTACTO_TRABAJADOR
+
+async def recibir_contacto_trabajador(update: Update, context: CallbackContext):
+    context.user_data["contacto"] = update.message.text
+    datos = context.user_data
+    if not candidatos_db:
+        await update.message.reply_text("⚠️ No se puede acceder a la base de datos.")
+        return ConversationHandler.END
+    
+    try:
+        candidatos_db.append_row([
+            datos["nombre"],
+            datos["trabajo"],
+            datos["escolaridad"],
+            datos["contacto"],
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ])
+        await update.message.reply_text("✅ ¡Tu perfil fue registrado correctamente!")
+    except Exception as e:
+        logger.error(f"❌ Error registrando candidato: {e}")
+        await update.message.reply_text("❌ Ocurrió un error al guardar tu información.")
+    return ConversationHandler.END
+
 # ---- Función principal ----
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
@@ -235,10 +332,12 @@ def main():
             ("ofertar", "Publicar oferta de empleo"),
             ("buscar", "Buscar ofertas"),
             ("buscoempleo", "Registrarte como buscador de empleo"),
+            ("buscarcandidatos", "Buscar trabajadores"),
             ("silenciar", "Desactivar notificaciones"),
             ("activar", "Activar notificaciones"),
             ("help", "Ver ayuda")
         ])
+        logger.info("✅ Comandos establecidos")
     
     app.post_init = establecer_comandos
     
@@ -251,8 +350,30 @@ def main():
     app.add_handler(CommandHandler("menu", menu))
     app.add_handler(CommandHandler("silenciar", silenciar_notificaciones))
     app.add_handler(CommandHandler("activar", activar_notificaciones))
+    app.add_handler(CommandHandler("buscarcandidatos", buscar_candidatos))
     
-    # (Aquí añade el resto de tus handlers existentes...)
+    # Handlers para flujos de conversación
+    registro_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("buscoempleo", iniciar_registro_trabajador),
+            CallbackQueryHandler(iniciar_registro_trabajador, pattern="^registro$")
+        ],
+        states={
+            NOMBRE: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_nombre)],
+            TRABAJO: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_trabajo)],
+            ESCOLARIDAD: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_escolaridad)],
+            CONTACTO_TRABAJADOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_contacto_trabajador)],
+        },
+        fallbacks=[CommandHandler("cancelar", lambda u,c: ConversationHandler.END)],
+        per_message=True
+    )
+    app.add_handler(registro_handler)
+    
+    # Handler para búsqueda de candidatos
+    app.add_handler(CallbackQueryHandler(ver_mas_candidatos, pattern="^ver_mas_candidatos$"))
+    
+    # Handler general para botones
+    app.add_handler(CallbackQueryHandler(manejar_botones))
     
     logger.info("🤖 Bot iniciado y escuchando...")
     app.run_polling()
