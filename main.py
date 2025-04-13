@@ -31,22 +31,37 @@ usuarios_db = None
 
 try:
     logger.info("🔧 Intentando conectar con Google Sheets...")
-    # Para Railway, las credenciales deben venir de una variable de entorno
-    creds_json = os.getenv('GOOGLE_CREDENTIALS')
-    if creds_json:
-        creds_dict = json.loads(creds_json)
-        CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-    else:
-        # Fallback al archivo local (para desarrollo)
-        CREDS = Credentials.from_service_account_file('credenciales.json', scopes=SCOPES)
     
+    # Opción 1: Credenciales desde variable de entorno (para Railway)
+    creds_json = os.getenv('GOOGLE_CREDS_JSON')  # Nombre exacto de tu variable
+    if creds_json:
+        try:
+            creds_dict = json.loads(creds_json)
+            CREDS = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+            logger.info("✅ Credenciales cargadas desde variable de entorno")
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Error decodificando JSON de credenciales: {str(e)}")
+            raise
+    else:
+        # Opción 2: Credenciales desde archivo (para desarrollo local)
+        try:
+            CREDS = Credentials.from_service_account_file('credenciales.json', scopes=SCOPES)
+            logger.info("✅ Credenciales cargadas desde archivo local")
+        except Exception as e:
+            logger.error(f"❌ Error cargando credenciales desde archivo: {str(e)}")
+            raise
+    
+    # Conexión con Google Sheets
     client = gspread.authorize(CREDS)
     sheet = client.open("EmpleoMatanzasDB")
     ofertas_db = sheet.worksheet("Ofertas")
     usuarios_db = sheet.worksheet("Usuarios")
     logger.info("✅ Conexión exitosa con Google Sheets")
+    
 except Exception as e:
-    logger.error("❌ Error conectando con Google Sheets: %s", str(e))
+    logger.error(f"❌ Error crítico conectando con Google Sheets: {str(e)}")
+    # Decide si quieres que el bot continúe sin funcionalidad de Sheets
+    # raise  # Descomenta si quieres que falle completamente sin Sheets
 
 # ---- Constantes ----
 PALABRAS_PROHIBIDAS = {"singar", "fraude", "spam", "http://", "https://"}
