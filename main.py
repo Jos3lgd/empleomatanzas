@@ -149,14 +149,15 @@ async def ayuda(update: Update, context: CallbackContext):
     await update.message.reply_text(
         "*Hola, gracias por utilizar nuestro Bot*\n\n"
         "Puedes utilizar los comandos disponibles en el menú en la parte inferior izquierda o teclearlos:\n\n"
-        "📎 /start — Iniciar el bot\n"
-        "📋 /menu — Ver el menú interactivo\n"
-        "💼 /ofertar — Publicar una oferta de empleo\n"
-        "🔍 /buscar — Buscar ofertas publicadas\n"
-        "🧑‍💼 /buscoempleo — Registrarte como buscador de empleo\n"
-        "❌ /cancelar — Cancelar una acción activa\n\n"
+        "📎 /start \\— Iniciar el bot\n"
+        "📋 /menu \\— Ver el menú interactivo\n"
+        "💼 /ofertar \\— Publicar una oferta de empleo\n"
+        "🔍 /buscar \\— Buscar ofertas publicadas\n"
+        "🧑‍💼 /buscoempleo \\— Registrarte como buscador de empleo\n"
+        "❌ /cancelar \\— Cancelar una acción activa\n\n"
         "👩‍💻 Este Bot está en fase Beta, si encuentras algún problema o tienes sugerencias puedes contactar con Soporte @AtencionPoblacionBot\n\n"
-        "⚠️ ATENCIÓN!!! Las ofertas se irán eliminando automáticamente cada 15 días, tenga eso en cuenta"
+        "*⚠️ ATENCIÓN\\!\\!\\!* Las ofertas se irán eliminando automáticamente cada 15 días, tenga eso en cuenta",
+        parse_mode="MarkdownV2
     )
 
 # Búsquedas
