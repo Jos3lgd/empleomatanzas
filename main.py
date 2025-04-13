@@ -61,24 +61,31 @@ except Exception as e:
 # Funciones de base de datos
 def registrar_usuario(user_id: int, nombre: str, username: str, chat_id: int):
     if not usuarios_db:
+        logger.error("No se pudo acceder a usuarios_db")
         return False
     try:
-        try:
-            usuarios_db.find(str(user_id))
-            return True
-        except gspread.exceptions.CellNotFound:
-            usuarios_db.append_row([
-                str(user_id),
-                nombre,
-                f"@{username}" if username else "Sin username",
-                str(chat_id),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "0",
-                "activo"
-            ])
-            return True
+        # Buscar si el usuario ya existe
+        cell = usuarios_db.find(str(user_id), in_column=1)
+        # Usuario existe, actualizar la fecha
+        row = cell.row
+        usuarios_db.update_cell(row, 5, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        logger.info(f"Fecha actualizada para usuario {user_id}")
+        return True
+    except gspread.exceptions.CellNotFound:
+        # Usuario no existe, crear nueva fila
+        usuarios_db.append_row([
+            str(user_id),
+            nombre,
+            f"@{username}" if username else "Sin username",
+            str(chat_id),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "0",
+            "activo"
+        ])
+        logger.info(f"Nuevo usuario registrado: {user_id}")
+        return True
     except Exception as e:
-        logger.error(f"Error registrando usuario: {e}")
+        logger.error(f"Error registrando usuario {user_id}: {e}")
         return False
 
 def nueva_oferta(user_id: int, datos: dict):
@@ -122,13 +129,13 @@ def nuevo_candidato(user_id: int, datos: dict):
 async def start(update: Update, context: CallbackContext):
     user = update.effective_user
     chat_id = update.effective_chat.id
-    registrar_usuario(user.id, user.first_name, user.username, chat_id)
+    if registrar_usuario(user.id, user.first_name, user.username, chat_id):
+        logger.info(f"Usuario {user.id} registrado o actualizado correctamente")
+    else:
+        logger.error(f"Fallo al registrar usuario {user.id}")
     await update.message.reply_photo(
         photo="https://github.com/Jos3lgd/mapa-circuitos-matanzas/blob/main/empleoMTZ.jpg?raw=true",
-        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n"
-        "💻 Este Bot está desarrollado por el equipo de @infomatanzas y está en fase Beta.\n\n"
-        "Usa /menu para ver opciones.\n"
-        "Usa /ayuda o el Botón Ayuda para conocer como funciona"
+        caption="👋 ¡Bienvenid@ al Bot Empleo Matanzas!\n\nUsa /menu para ver opciones."
     )
 
 async def menu(update: Update, context: CallbackContext):
