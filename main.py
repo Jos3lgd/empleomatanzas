@@ -158,138 +158,196 @@ async def ayuda(update: Update, context: CallbackContext):
 
 # Búsquedas
 async def buscar_ofertas(update: Update, context: CallbackContext):
-    context.user_data['pagina_ofertas'] = 1  # Inicializar página
+    context.user_data['pagina_ofertas'] = 0  # Inicializar en 0 para la primera página
+    logger.info("Iniciando búsqueda de ofertas")
     if not ofertas_db:
         await update.message.reply_text("Error al acceder a ofertas")
         return
     
     ofertas = ofertas_db.get_all_records()
+    logger.info(f"Se encontraron {len(ofertas)} ofertas")
     if not ofertas:
         await update.message.reply_text("No hay ofertas disponibles")
         return
     
-    for oferta in reversed(ofertas[:RESULTADOS_POR_PAGINA]):
-        await update.message.reply_text(
+    # Mostrar primeras ofertas
+    inicio = 0
+    fin = RESULTADOS_POR_PAGINA
+    ofertas_pagina = ofertas[inicio:fin]
+    
+    mensaje = ""
+    for oferta in reversed(ofertas_pagina):
+        mensaje += (
             f"💼 {oferta['Puesto']}\n"
             f"🏢 {oferta['Empresa']}\n"
             f"💰 {oferta['Salario']}\n"
-            f"📞 {oferta['Contacto']}"
+            f"📞 {oferta['Contacto']}\n\n"
         )
     
-    if len(ofertas) > RESULTADOS_POR_PAGINA:
-        await update.message.reply_text(
-            "¿Ver más ofertas?",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_ofertas")]
-            ])
-        )
+    # Crear teclado con botón "Ver más" si hay más resultados
+    keyboard = []
+    if len(ofertas) > fin:
+        keyboard.append([InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_ofertas")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+    await update.message.reply_text(
+        mensaje or "No hay ofertas para mostrar",
+        reply_markup=reply_markup
+    )
 
 async def buscar_candidatos(update: Update, context: CallbackContext):
-    context.user_data['pagina_candidatos'] = 1  # Inicializar página
+    context.user_data['pagina_candidatos'] = 0  # Inicializar en 0 para la primera página
+    logger.info("Iniciando búsqueda de candidatos")
     if not candidatos_db:
         await update.message.reply_text("Error al acceder a candidatos")
         return
     
     candidatos = candidatos_db.get_all_records()
+    logger.info(f"Se encontraron {len(candidatos)} candidatos")
     if not candidatos:
         await update.message.reply_text("No hay candidatos registrados")
         return
     
-    for candidato in reversed(candidatos[:RESULTADOS_POR_PAGINA]):
-        await update.message.reply_text(
+    # Mostrar primeros candidatos
+    inicio = 0
+    fin = RESULTADOS_POR_PAGINA
+    candidatos_pagina = candidatos[inicio:fin]
+    
+    mensaje = ""
+    for candidato in reversed(candidatos_pagina):
+        mensaje += (
             f"👤 {candidato['Nombre']}\n"
             f"🛠️ {candidato['Trabajo']}\n"
-            f"📞 {candidato['Contacto']}"
+            f"📞 {candidato['Contacto']}\n\n"
         )
     
-    if len(candidatos) > RESULTADOS_POR_PAGINA:
-        await update.message.reply_text(
-            "¿Ver más candidatos?",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_candidatos")]
-            ])
-        )
+    # Crear teclado con botón "Ver más" si hay más resultados
+    keyboard = []
+    if len(candidatos) > fin:
+        keyboard.append([InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_candidatos")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+    await update.message.reply_text(
+        mensaje or "No hay candidatos para mostrar",
+        reply_markup=reply_markup
+    )
 
 # Paginación
 async def ver_mas_ofertas(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
+    logger.info("Procesando ver_mas_ofertas")
     
-    pagina = context.user_data.get('pagina_ofertas', 1) + 1
+    # Incrementar página
+    pagina = context.user_data.get('pagina_ofertas', 0) + 1
     context.user_data['pagina_ofertas'] = pagina
+    logger.info(f"Mostrando página {pagina} de ofertas")
     
     if not ofertas_db:
-        await query.message.reply_text("Error al acceder a ofertas")
+        await query.message.edit_text("Error al acceder a ofertas")
         return
     
     ofertas = ofertas_db.get_all_records()
     if not ofertas:
-        await query.message.reply_text("No hay más ofertas disponibles")
+        await query.message.edit_text("No hay más ofertas disponibles")
+        context.user_data['pagina_ofertas'] = 0
         return
     
-    inicio = (pagina - 1) * RESULTADOS_POR_PAGINA
+    # Calcular índices
+    inicio = pagina * RESULTADOS_POR_PAGINA
     fin = inicio + RESULTADOS_POR_PAGINA
     ofertas_pagina = ofertas[inicio:fin]
+    logger.info(f"Ofertas en página {pagina}: {len(ofertas_pagina)}")
     
     if not ofertas_pagina:
-        await query.message.reply_text("No hay más ofertas para mostrar")
-        context.user_data['pagina_ofertas'] = 1
+        await query.message.edit_text("No hay más ofertas para mostrar")
+        context.user_data['pagina_ofertas'] = 0
         return
     
+    # Construir mensaje
+    mensaje = ""
     for oferta in reversed(ofertas_pagina):
-        await query.message.reply_text(
+        mensaje += (
             f"💼 {oferta['Puesto']}\n"
             f"🏢 {oferta['Empresa']}\n"
             f"💰 {oferta['Salario']}\n"
-            f"📞 {oferta['Contacto']}"
+            f"📞 {oferta['Contacto']}\n\n"
         )
     
+    # Actualizar teclado
+    keyboard = []
     if fin < len(ofertas):
+        keyboard.append([InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_ofertas")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+    try:
+        await query.message.edit_text(
+            mensaje or "No hay más ofertas para mostrar",
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logger.error(f"Error editando mensaje: {e}")
         await query.message.reply_text(
-            "¿Ver más ofertas?",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_ofertas")]
-            ])
+            mensaje or "No hay más ofertas para mostrar",
+            reply_markup=reply_markup
         )
 
 async def ver_mas_candidatos(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
+    logger.info("Procesando ver_mas_candidatos")
     
-    pagina = context.user_data.get('pagina_candidatos', 1) + 1
+    # Incrementar página
+    pagina = context.user_data.get('pagina_candidatos', 0) + 1
     context.user_data['pagina_candidatos'] = pagina
+    logger.info(f"Mostrando página {pagina} de candidatos")
     
     if not candidatos_db:
-        await query.message.reply_text("Error al acceder a candidatos")
+        await query.message.edit_text("Error al acceder a candidatos")
         return
     
     candidatos = candidatos_db.get_all_records()
     if not candidatos:
-        await query.message.reply_text("No hay más candidatos disponibles")
+        await query.message.edit_text("No hay más candidatos disponibles")
+        context.user_data['pagina_candidatos'] = 0
         return
     
-    inicio = (pagina - 1) * RESULTADOS_POR_PAGINA
+    # Calcular índices
+    inicio = pagina * RESULTADOS_POR_PAGINA
     fin = inicio + RESULTADOS_POR_PAGINA
     candidatos_pagina = candidatos[inicio:fin]
+    logger.info(f"Candidatos en página {pagina}: {len(candidatos_pagina)}")
     
     if not candidatos_pagina:
-        await query.message.reply_text("No hay más candidatos para mostrar")
-        context.user_data['pagina_candidatos'] = 1
+        await query.message.edit_text("No hay más candidatos para mostrar")
+        context.user_data['pagina_candidatos'] = 0
         return
     
+    # Construir mensaje
+    mensaje = ""
     for candidato in reversed(candidatos_pagina):
-        await query.message.reply_text(
+        mensaje += (
             f"👤 {candidato['Nombre']}\n"
             f"🛠️ {candidato['Trabajo']}\n"
-            f"📞 {candidato['Contacto']}"
+            f"📞 {candidato['Contacto']}\n\n"
         )
     
+    # Actualizar teclado
+    keyboard = []
     if fin < len(candidatos):
+        keyboard.append([InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_candidatos")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+    try:
+        await query.message.edit_text(
+            mensaje or "No hay más candidatos para mostrar",
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logger.error(f"Error editando mensaje: {e}")
         await query.message.reply_text(
-            "¿Ver más candidatos?",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➡️ Ver más", callback_data="ver_mas_candidatos")]
-            ])
+            mensaje or "No hay más candidatos para mostrar",
+            reply_markup=reply_markup
         )
 
 # ConversationHandler para oferta
@@ -406,6 +464,7 @@ async def enviar_mensaje(update: Update, context: CallbackContext):
 async def handle_button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
+    logger.info(f"Callback recibido: {query.data}")
     
     if query.data == "buscar_ofertas":
         await buscar_ofertas(query, context)
@@ -418,9 +477,9 @@ async def handle_button(update: Update, context: CallbackContext):
     elif query.data == "mostrar_ayuda":
         await ayuda(query, context)
     elif query.data == "ver_mas_ofertas":
-        await ver_mas_ofertas(query, context)
+        await ver_mas_ofertas(update, context)
     elif query.data == "ver_mas_candidatos":
-        await ver_mas_candidatos(query, context)
+        await ver_mas_candidatos(update, context)
 
 # Función principal
 def main():
